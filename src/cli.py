@@ -2,6 +2,7 @@
 
 import argparse
 import sys
+from tabulate import tabulate
 
 from .config import Config
 from .brute_force import BruteForceRunner
@@ -119,35 +120,43 @@ Examples:
             cache = ResultCache('data/results.db')
             stats = cache.get_statistics()
             
-            print("="*60)
-            print("DETAILED STATISTICS")
-            print("="*60)
+            print("="*80)
+            print("STATISTICS TABLE")
+            print("="*80)
             print(f"\nTotal pairs checked: {stats['total']}")
-            print(f"\nDependency Finding:")
-            print(f"  Dependencies found: {stats['with_dependency']}")
-            print(f"    - Trivial (rejected): {stats['trivial_rejected']}")
-            print(f"    - Non-trivial (kept): {stats['nontrivial_found']}")
-            print(f"  No dependency found: {stats['no_dependency']}")
+            print()
             
-            print(f"\nDivisibility Results (for non-trivial dependencies):")
-            print(f"  ∂q/∂f : ∂q/∂x only: {stats['df_divisible_only']}")
-            print(f"  ∂q/∂g : ∂q/∂x only: {stats['dg_divisible_only']}")
-            print(f"  Both conditions satisfied: {stats['both_divisible']}")
+            # Calculate failed counts
+            failed_nontrivial = stats['nontrivial_found'] - stats['both_divisible']
+            failed_df = stats['nontrivial_found'] - (stats['df_divisible_only'] + stats['both_divisible'])
+            failed_dg = stats['nontrivial_found'] - (stats['dg_divisible_only'] + stats['both_divisible'])
             
-            if stats['total'] > 0:
-                print(f"\nPercentages:")
-                dep_pct = (stats['with_dependency'] / stats['total']) * 100
-                trivial_pct = (stats['trivial_rejected'] / stats['total']) * 100
-                nontrivial_pct = (stats['nontrivial_found'] / stats['total']) * 100
-                no_dep_pct = (stats['no_dependency'] / stats['total']) * 100
-                print(f"  Any dependency found: {dep_pct:.1f}%")
-                print(f"  Trivial (rejected): {trivial_pct:.1f}%")
-                print(f"  Non-trivial (kept): {nontrivial_pct:.1f}%")
-                print(f"  No dependency: {no_dep_pct:.1f}%")
-                
-                if stats['nontrivial_found'] > 0:
-                    both_of_nontrivial = (stats['both_divisible'] / stats['nontrivial_found']) * 100
-                    print(f"  Both conditions (of non-trivial): {both_of_nontrivial:.1f}%")
+            # Prepare table data
+            dep_pct = (stats['with_dependency'] / stats['total'] * 100) if stats['total'] > 0 else 0
+            nontrivial_pct = (stats['nontrivial_found'] / stats['total'] * 100) if stats['total'] > 0 else 0
+            failed_trivial = stats['trivial_rejected'] + stats['no_dependency']
+            
+            df_passed = stats['df_divisible_only'] + stats['both_divisible']
+            df_pct = (df_passed / stats['nontrivial_found'] * 100) if stats['nontrivial_found'] > 0 else 0
+            
+            dg_passed = stats['dg_divisible_only'] + stats['both_divisible']
+            dg_pct = (dg_passed / stats['nontrivial_found'] * 100) if stats['nontrivial_found'] > 0 else 0
+            
+            both_pct = (stats['both_divisible'] / stats['nontrivial_found'] * 100) if stats['nontrivial_found'] > 0 else 0
+            
+            table_data = [
+                ["Dependency found (any)", stats['with_dependency'], stats['no_dependency'], f"{dep_pct:.2f}%"],
+                ["Non-trivial dependency (x² or x*u or x*v)", stats['nontrivial_found'], failed_trivial, f"{nontrivial_pct:.2f}%"],
+                ["∂q/∂f : ∂q/∂x (after substitution)", df_passed, failed_df, f"{df_pct:.2f}%"],
+                ["∂q/∂g : ∂q/∂x (after substitution)", dg_passed, failed_dg, f"{dg_pct:.2f}%"],
+                ["Both divisibility conditions", stats['both_divisible'], failed_nontrivial, f"{both_pct:.2f}%"],
+            ]
+            
+            headers = ["Condition", "Passed", "Failed", "Percent"]
+            print(tabulate(table_data, headers=headers, tablefmt="grid"))
+            
+            print()
+            print("Note: Percentages for divisibility conditions are calculated from non-trivial dependencies only.")
             
             cache.close()
         
