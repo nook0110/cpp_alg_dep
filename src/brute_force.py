@@ -20,7 +20,7 @@ def process_pair_worker(args):
         args: Tuple of (f, g, config)
         
     Returns:
-        Tuple of (f, g, q, divisibility, was_cached)
+        Tuple of (f, g, q, divisibility, was_trivial, was_cached)
     """
     f, g, config = args
     
@@ -31,21 +31,21 @@ def process_pair_worker(args):
         # Check cache first
         cached = cache.get_result(f, g)
         if cached:
-            return (f, g, None, {}, True)
+            return (f, g, None, {}, False, True)
         
         # Create instances for this process
         finder = DependencyFinder(config)
         checker = DivisibilityChecker()
         
-        # Find dependency
-        q = finder.find_dependency(f, g)
+        # Find dependency (returns tuple: q, was_trivial)
+        q, was_trivial = finder.find_dependency(f, g)
         
         # Check divisibility if dependency found
         divisibility = {}
         if q:
             divisibility = checker.check_conditions(q, f, g)
         
-        return (f, g, q, divisibility, False)
+        return (f, g, q, divisibility, was_trivial, False)
     finally:
         cache.close()
 
@@ -121,9 +121,15 @@ class BruteForceRunner:
             cache = ResultCache(self.config.cache_file)
             try:
                 stats = cache.get_statistics()
-                print(f"\nCache statistics:")
-                print(f"  Total results: {stats['total']}")
-                print(f"  With dependency: {stats['with_dependency']}")
+                print(f"\nDetailed Statistics:")
+                print(f"  Total pairs checked: {stats['total']}")
+                print(f"  Dependencies found: {stats['with_dependency']}")
+                print(f"    - Trivial (rejected): {stats['trivial_rejected']}")
+                print(f"    - Non-trivial (kept): {stats['nontrivial_found']}")
+                print(f"  No dependency found: {stats['no_dependency']}")
+                print(f"\nDivisibility Results (for non-trivial dependencies):")
+                print(f"  ∂q/∂f : ∂q/∂x only: {stats['df_divisible_only']}")
+                print(f"  ∂q/∂g : ∂q/∂x only: {stats['dg_divisible_only']}")
                 print(f"  Both conditions satisfied: {stats['both_divisible']}")
             finally:
                 cache.close()
@@ -151,14 +157,16 @@ class BruteForceRunner:
                 f, g = future_to_pair[future]
                 
                 try:
-                    f_result, g_result, q, divisibility, was_cached = future.result()
+                    f_result, g_result, q, divisibility, was_trivial, was_cached = future.result()
                     
                     if was_cached:
                         print(f"[CACHED] f={f}, g={g}")
                     else:
                         print(f"[CHECKED] f={f}, g={g}")
                         
-                        if q:
+                        if was_trivial:
+                            print(f"  Found dependency but REJECTED as trivial (only linear x)")
+                        elif q:
                             print(f"  Found q={q}")
                             print(f"  ∂q/∂f : ∂q/∂x = {divisibility['df_divisible']}")
                             print(f"  ∂q/∂g : ∂q/∂x = {divisibility['dg_divisible']}")
@@ -169,7 +177,7 @@ class BruteForceRunner:
                         with self.cache_lock:
                             cache = ResultCache(self.config.cache_file)
                             try:
-                                cache.save_result(f, g, q, divisibility)
+                                cache.save_result(f, g, q, divisibility, was_trivial)
                             finally:
                                 cache.close()
                         

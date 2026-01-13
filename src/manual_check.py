@@ -61,16 +61,24 @@ class ManualChecker:
         print(f"Max degree for q: {self.config.max_degree_q}")
         print()
         
-        q = self.finder.find_dependency(f, g)
+        q, was_trivial = self.finder.find_dependency(f, g)
+        
+        if was_trivial:
+            print("✗ Found dependency but REJECTED as trivial (only linear x)")
+            print("   Trivial dependencies like '4*x - 5' are not meaningful.")
+            print()
+            # Save result with trivial flag
+            self.cache.save_result(f, g, None, {}, is_trivial=True)
+            return
         
         if not q:
             print("No dependency found within degree bounds.")
             print()
             # Save negative result
-            self.cache.save_result(f, g, None, {})
+            self.cache.save_result(f, g, None, {}, is_trivial=False)
             return
         
-        print(f"✓ Found dependency:")
+        print(f"✓ Found non-trivial dependency:")
         print(f"  q = {q}")
         print()
         
@@ -90,7 +98,7 @@ class ManualChecker:
         print()
         
         # Save result
-        self.cache.save_result(f, g, q, divisibility)
+        self.cache.save_result(f, g, q, divisibility, is_trivial=False)
         print("Result saved to cache.")
     
     def _print_result(self, result: dict):
@@ -103,7 +111,9 @@ class ManualChecker:
         print(f"  f = {result['f_poly']}")
         print(f"  g = {result['g_poly']}")
         
-        if result['q_poly']:
+        if result.get('is_trivial'):
+            print("  ✗ Dependency found but rejected as trivial (only linear x)")
+        elif result['q_poly']:
             print(f"  q = {result['q_poly']}")
             print(f"  ∂q/∂u : ∂q/∂x = {bool(result['df_divisible'])}")
             print(f"  ∂q/∂v : ∂q/∂x = {bool(result['dg_divisible'])}")

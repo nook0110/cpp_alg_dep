@@ -22,7 +22,55 @@ class DependencyFinder:
         self.config = config
         self.x, self.y, self.u, self.v = x, y, u, v
     
-    def find_dependency(self, f, g) -> Optional:
+    def _is_nontrivial_in_x(self, q) -> bool:
+        """
+        Check if x appears non-trivially in q.
+        
+        Non-trivial means:
+        - x appears with degree >= 2 (like x^2, x^3, etc.), OR
+        - x is multiplied with u or v (like x*u, x*v, x*u*v, etc.)
+        
+        Trivial (rejected):
+        - Only linear in x without u,v: like 4*x - 5
+        
+        Args:
+            q: Polynomial in Q[x,u,v]
+            
+        Returns:
+            True if x appears non-trivially, False otherwise
+        """
+        from sympy import degree, Poly
+        
+        try:
+            # Convert to polynomial
+            poly = Poly(q, self.x, self.u, self.v)
+            
+            # Check all monomials
+            for monom, coeff in poly.terms():
+                x_deg, u_deg, v_deg = monom
+                
+                # Skip constant and pure u,v terms
+                if x_deg == 0:
+                    continue
+                
+                # x appears with degree >= 2: non-trivial
+                if x_deg >= 2:
+                    return True
+                
+                # x appears with degree 1
+                if x_deg == 1:
+                    # If multiplied with u or v: non-trivial
+                    if u_deg > 0 or v_deg > 0:
+                        return True
+            
+            # Only linear x terms without u,v: trivial
+            return False
+            
+        except:
+            # If we can't analyze, be conservative and accept it
+            return True
+    
+    def find_dependency(self, f, g):
         """
         Find q(x, u, v) such that q(x, f(x,y), g(x,y)) = 0.
         
@@ -38,24 +86,39 @@ class DependencyFinder:
             g: Second polynomial in Z[x,y]
             
         Returns:
-            Polynomial q in Q[x,u,v] if found, None otherwise
+            Tuple (q, was_trivial) where:
+            - q: Polynomial q in Q[x,u,v] if found, None otherwise
+            - was_trivial: True if a dependency was found but rejected as trivial
         """
         # Try resultant method first
         q = self._try_resultant(f, g)
         if q is not None:
-            return q
+            if self._is_nontrivial_in_x(q):
+                return q, False
+            else:
+                # Found dependency but it's trivial
+                return None, True
         
         # Try Gröbner basis as backup
         q = self._try_groebner(f, g)
         if q is not None:
-            return q
+            if self._is_nontrivial_in_x(q):
+                return q, False
+            else:
+                # Found dependency but it's trivial
+                return None, True
         
         # Fallback to brute force
         for q in self._generate_candidates():
             if self._is_dependency(q, f, g):
-                return q
+                if self._is_nontrivial_in_x(q):
+                    return q, False
+                else:
+                    # Found dependency but it's trivial
+                    return None, True
         
-        return None
+        # No dependency found at all
+        return None, False
     
     def _try_resultant(self, f, g) -> Optional:
         """

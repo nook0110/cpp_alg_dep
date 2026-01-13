@@ -120,18 +120,34 @@ Examples:
             stats = cache.get_statistics()
             
             print("="*60)
-            print("STATISTICS")
+            print("DETAILED STATISTICS")
             print("="*60)
-            print(f"Total pairs checked: {stats['total']}")
-            print(f"Pairs with dependency: {stats['with_dependency']}")
-            print(f"Pairs with both conditions satisfied: {stats['both_divisible']}")
+            print(f"\nTotal pairs checked: {stats['total']}")
+            print(f"\nDependency Finding:")
+            print(f"  Dependencies found: {stats['with_dependency']}")
+            print(f"    - Trivial (rejected): {stats['trivial_rejected']}")
+            print(f"    - Non-trivial (kept): {stats['nontrivial_found']}")
+            print(f"  No dependency found: {stats['no_dependency']}")
+            
+            print(f"\nDivisibility Results (for non-trivial dependencies):")
+            print(f"  ∂q/∂f : ∂q/∂x only: {stats['df_divisible_only']}")
+            print(f"  ∂q/∂g : ∂q/∂x only: {stats['dg_divisible_only']}")
+            print(f"  Both conditions satisfied: {stats['both_divisible']}")
             
             if stats['total'] > 0:
-                dep_pct = (stats['with_dependency'] / stats['total']) * 100
-                both_pct = (stats['both_divisible'] / stats['total']) * 100
                 print(f"\nPercentages:")
-                print(f"  With dependency: {dep_pct:.1f}%")
-                print(f"  Both conditions: {both_pct:.1f}%")
+                dep_pct = (stats['with_dependency'] / stats['total']) * 100
+                trivial_pct = (stats['trivial_rejected'] / stats['total']) * 100
+                nontrivial_pct = (stats['nontrivial_found'] / stats['total']) * 100
+                no_dep_pct = (stats['no_dependency'] / stats['total']) * 100
+                print(f"  Any dependency found: {dep_pct:.1f}%")
+                print(f"  Trivial (rejected): {trivial_pct:.1f}%")
+                print(f"  Non-trivial (kept): {nontrivial_pct:.1f}%")
+                print(f"  No dependency: {no_dep_pct:.1f}%")
+                
+                if stats['nontrivial_found'] > 0:
+                    both_of_nontrivial = (stats['both_divisible'] / stats['nontrivial_found']) * 100
+                    print(f"  Both conditions (of non-trivial): {both_of_nontrivial:.1f}%")
             
             cache.close()
         
