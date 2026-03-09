@@ -3,8 +3,6 @@
 #include "divisibility.h"
 #include "cache.h"
 #include <iostream>
-#include <thread>
-#include <mutex>
 
 BruteForceRunner::BruteForceRunner(const Config& config)
     : config_(config),
@@ -19,7 +17,6 @@ void BruteForceRunner::run() {
     std::cout << "  Max degree g: " << config_.max_degree_g << std::endl;
     std::cout << "  Max degree q: " << config_.max_degree_q << std::endl;
     std::cout << "  Coefficient range: [" << config_.coeff_min << ", " << config_.coeff_max << "]" << std::endl;
-    std::cout << "  Workers: " << config_.num_workers << std::endl;
     
     if (state_.total_pairs_checked > 0) {
         std::cout << "Resuming from previous state:" << std::endl;
