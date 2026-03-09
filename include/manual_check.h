@@ -4,6 +4,7 @@
 #include "dependency_finder.h"
 #include "divisibility.h"
 #include "cache.h"
+#include "symbols.h"
 #include <string>
 #include <memory>
 
@@ -16,6 +17,7 @@ public:
 
 private:
     Config config_;
+    ThreadLocalSymbols symbols_;
     std::unique_ptr<DependencyFinder> finder_;
     std::unique_ptr<DivisibilityChecker> checker_;
     std::unique_ptr<ResultCache> cache_;

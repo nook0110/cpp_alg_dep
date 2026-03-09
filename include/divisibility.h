@@ -1,5 +1,6 @@
 #pragma once
 
+#include "symbols.h"
 #include <ginac/ginac.h>
 #include <map>
 #include <string>
@@ -12,12 +13,10 @@ struct DivisibilityResult {
 
 class DivisibilityChecker {
 public:
-    DivisibilityChecker();
+    explicit DivisibilityChecker(const ThreadLocalSymbols& symbols);
     
     DivisibilityResult check_conditions(const GiNaC::ex& q, const GiNaC::ex& f, const GiNaC::ex& g);
 
 private:
-    GiNaC::symbol x_;
-    GiNaC::symbol u_;
-    GiNaC::symbol v_;
+    const ThreadLocalSymbols& symbols_;
 };

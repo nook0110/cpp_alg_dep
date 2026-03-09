@@ -1,19 +1,17 @@
 #include "dependency_finder.h"
 #include "polynomial.h"
-#include "symbols.h"
 
 using namespace GiNaC;
-using namespace PolySymbols;
 
-DependencyFinder::DependencyFinder(const Config& config)
-    : config_(config), x_(x), y_(y), u_(u), v_(v) {}
+DependencyFinder::DependencyFinder(const Config& config, const ThreadLocalSymbols& symbols)
+    : config_(config), symbols_(symbols) {}
 
 bool DependencyFinder::is_nontrivial_in_x(const ex& q) const {
     try {
         for (const auto& term : q) {
-            int x_deg = term.degree(x_);
-            int u_deg = term.degree(u_);
-            int v_deg = term.degree(v_);
+            int x_deg = term.degree(symbols_.x);
+            int u_deg = term.degree(symbols_.u);
+            int v_deg = term.degree(symbols_.v);
             
             if (x_deg == 0) continue;
             if (x_deg >= 2) return true;
@@ -37,16 +35,16 @@ std::pair<std::optional<ex>, bool> DependencyFinder::find_dependency(const ex& f
 
 std::optional<ex> DependencyFinder::try_resultant(const ex& f, const ex& g) {
     try {
-        ex p1 = u_ - f;
-        ex p2 = v_ - g;
+        ex p1 = symbols_.u - f;
+        ex p2 = symbols_.v - g;
         
         p1 = expand(p1);
         p2 = expand(p2);
         
-        ex res = resultant(p1, p2, y_);
+        ex res = resultant(p1, p2, symbols_.y);
         res = expand(res);
         
-        if (!res.is_zero() && !res.has(y_)) {
+        if (!res.is_zero() && !res.has(symbols_.y)) {
             return res;
         }
         

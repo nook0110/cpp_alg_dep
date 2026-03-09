@@ -4,8 +4,9 @@
 
 ManualChecker::ManualChecker(const Config& config)
     : config_(config),
-      finder_(std::make_unique<DependencyFinder>(config)),
-      checker_(std::make_unique<DivisibilityChecker>()),
+      symbols_(),
+      finder_(std::make_unique<DependencyFinder>(config, symbols_)),
+      checker_(std::make_unique<DivisibilityChecker>(symbols_)),
       cache_(std::make_unique<ResultCache>(config.cache_file)) {}
 
 ManualChecker::~ManualChecker() = default;

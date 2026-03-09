@@ -18,8 +18,8 @@ struct Config {
     std::string cache_file = "data/results.db";
     std::string state_file = "data/state.json";
     int batch_size = 100;
-    int checkpoint_interval = 10;
-    int num_workers = 4;
+    int checkpoint_interval = 1000;
+    int num_workers = 0;
     
     void validate() const;
 };

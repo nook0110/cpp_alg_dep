@@ -141,6 +141,50 @@ void ResultCache::save_result(const GiNaC::ex& f, const GiNaC::ex& g,
     sqlite3_finalize(stmt);
 }
 
+void ResultCache::save_results_batch(const std::vector<ResultToSave>& results) {
+    if (results.empty()) {
+        return;
+    }
+    
+    sqlite3_exec(db_, "BEGIN TRANSACTION", nullptr, nullptr, nullptr);
+    
+    const char* sql = R"(
+        INSERT OR REPLACE INTO results
+        (f_poly, g_poly, f_hash, g_hash, q_poly, is_trivial, df_divisible, dg_divisible, both_divisible)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    )";
+    
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
+        return;
+    }
+    
+    for (const auto& result : results) {
+        sqlite3_bind_text(stmt, 1, result.f_str.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, result.g_str.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 3, result.f_hash.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 4, result.g_hash.c_str(), -1, SQLITE_TRANSIENT);
+        
+        if (result.q_str.has_value()) {
+            sqlite3_bind_text(stmt, 5, result.q_str.value().c_str(), -1, SQLITE_TRANSIENT);
+        } else {
+            sqlite3_bind_null(stmt, 5);
+        }
+        
+        sqlite3_bind_int(stmt, 6, result.is_trivial ? 1 : 0);
+        sqlite3_bind_int(stmt, 7, result.divisibility.df_divisible ? 1 : 0);
+        sqlite3_bind_int(stmt, 8, result.divisibility.dg_divisible ? 1 : 0);
+        sqlite3_bind_int(stmt, 9, result.divisibility.both_divisible ? 1 : 0);
+        
+        sqlite3_step(stmt);
+        sqlite3_reset(stmt);
+    }
+    
+    sqlite3_finalize(stmt);
+    sqlite3_exec(db_, "COMMIT", nullptr, nullptr, nullptr);
+}
+
 Statistics ResultCache::get_statistics() {
     const char* sql = R"(
         SELECT

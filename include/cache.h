@@ -41,6 +41,16 @@ struct StatRow {
     int count;
 };
 
+struct ResultToSave {
+    std::string f_str;
+    std::string g_str;
+    std::string f_hash;
+    std::string g_hash;
+    std::optional<std::string> q_str;
+    bool is_trivial;
+    DivisibilityResult divisibility;
+};
+
 class ResultCache {
 public:
     explicit ResultCache(const std::string& db_path);
@@ -50,14 +60,16 @@ public:
     ResultCache& operator=(const ResultCache&) = delete;
     
     std::optional<CachedResult> get_result(const GiNaC::ex& f, const GiNaC::ex& g);
-    void save_result(const GiNaC::ex& f, const GiNaC::ex& g, 
+    void save_result(const GiNaC::ex& f, const GiNaC::ex& g,
                      const std::optional<GiNaC::ex>& q,
                      const DivisibilityResult& divisibility,
                      bool is_trivial);
+    void save_results_batch(const std::vector<ResultToSave>& results);
     Statistics get_statistics();
     std::vector<StatRow> get_detailed_statistics();
     std::vector<CachedResult> query_results(bool both_divisible = false, bool nontrivial_only = false, bool trivial_only = false);
     
+    sqlite3* get_db() { return db_; }
     void close();
 
 private:
