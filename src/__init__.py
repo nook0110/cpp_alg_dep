@@ -1,1 +1,0 @@
-# Polynomial Algebraic Dependency Checker
