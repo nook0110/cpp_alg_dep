@@ -25,6 +25,10 @@ ex PolynomialOps::substitute(const ex& poly, const symbol& var, const ex& expr) 
 }
 
 bool PolynomialOps::is_divisible(const ex& dividend, const ex& divisor) {
+    if (dividend.is_zero() && divisor.is_zero()) {
+        return true;
+    }
+    
     if (divisor.is_zero()) {
         return false;
     }

@@ -14,13 +14,15 @@ DivisibilityResult DivisibilityChecker::check_conditions(const ex& q, const ex& 
         
         ex dq_dx_sub = dq_dx.subs(lst{symbols_.u == f, symbols_.v == g});
         ex dq_du_sub = dq_du.subs(lst{symbols_.u == f, symbols_.v == g});
-        ex dq_dv_sub = dq_dv.subs(lst{symbols_.v == f, symbols_.v == g});
+        ex dq_dv_sub = dq_dv.subs(lst{symbols_.u == f, symbols_.v == g});
+        
+        bool all_zero = dq_dx_sub.is_zero() && dq_du_sub.is_zero() && dq_dv_sub.is_zero();
         
         bool df_divisible = PolynomialOps::is_divisible(dq_du_sub, dq_dx_sub);
         bool dg_divisible = PolynomialOps::is_divisible(dq_dv_sub, dq_dx_sub);
         
-        return {df_divisible, dg_divisible, df_divisible && dg_divisible};
+        return {df_divisible, dg_divisible, df_divisible && dg_divisible, all_zero};
     } catch (...) {
-        return {false, false, false};
+        return {false, false, false, false};
     }
 }

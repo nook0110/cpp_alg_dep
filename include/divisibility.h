@@ -6,9 +6,10 @@
 #include <string>
 
 struct DivisibilityResult {
-    bool df_divisible;
-    bool dg_divisible;
-    bool both_divisible;
+    bool df_divisible = false;
+    bool dg_divisible = false;
+    bool both_divisible = false;
+    bool needs_review = false;
 };
 
 class DivisibilityChecker {

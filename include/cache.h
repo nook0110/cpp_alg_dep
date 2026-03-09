@@ -18,6 +18,7 @@ struct CachedResult {
     bool df_divisible;
     bool dg_divisible;
     bool both_divisible;
+    bool needs_review;
     std::string timestamp;
 };
 
@@ -63,11 +64,12 @@ public:
     void save_result(const GiNaC::ex& f, const GiNaC::ex& g,
                      const std::optional<GiNaC::ex>& q,
                      const DivisibilityResult& divisibility,
-                     bool is_trivial);
+                     bool is_trivial,
+                     bool needs_review = false);
     void save_results_batch(const std::vector<ResultToSave>& results);
     Statistics get_statistics();
     std::vector<StatRow> get_detailed_statistics();
-    std::vector<CachedResult> query_results(bool both_divisible = false, bool nontrivial_only = false, bool trivial_only = false);
+    std::vector<CachedResult> query_results(bool both_divisible = false, bool nontrivial_only = false, bool trivial_only = false, bool needs_review = false);
     
     sqlite3* get_db() { return db_; }
     void close();

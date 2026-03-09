@@ -67,6 +67,10 @@ void ManualChecker::check_pair(const std::string& f_str, const std::string& g_st
     std::cout << "  dq/dv : dq/dx = " << (divisibility.dg_divisible ? "true" : "false") << std::endl;
     std::cout << std::endl;
     
+    if (divisibility.needs_review) {
+        std::cout << "⚠ WARNING: All derivatives are zero (0/0 case) - flagged for review" << std::endl;
+    }
+    
     if (divisibility.both_divisible) {
         std::cout << "+ Both divisibility conditions satisfied!" << std::endl;
     } else {
@@ -75,7 +79,7 @@ void ManualChecker::check_pair(const std::string& f_str, const std::string& g_st
     
     std::cout << std::endl;
     
-    cache_->save_result(f, g, q, divisibility, was_trivial);
+    cache_->save_result(f, g, q, divisibility, was_trivial, divisibility.needs_review);
     std::cout << "Result saved to cache." << std::endl;
 }
 

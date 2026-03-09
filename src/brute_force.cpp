@@ -104,7 +104,7 @@ ResultToSave BruteForceRunner::process_single_pair(const std::string& f_str, con
     DivisibilityChecker checker(symbols);
     
     auto [q, was_trivial] = finder.find_dependency(f, g);
-    DivisibilityResult divisibility = {false, false, false};
+    DivisibilityResult divisibility = {false, false, false, false};
     
     if (q.has_value()) {
         divisibility = checker.check_conditions(q.value(), f, g);

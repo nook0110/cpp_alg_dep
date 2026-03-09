@@ -36,6 +36,7 @@ void ResultCache::create_tables() {
             df_divisible INTEGER,
             dg_divisible INTEGER,
             both_divisible INTEGER,
+            needs_review INTEGER DEFAULT 0,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(f_hash, g_hash)
         )
@@ -48,11 +49,16 @@ void ResultCache::create_tables() {
         throw std::runtime_error("Failed to create table: " + error);
     }
     
+    const char* add_column_sql = "ALTER TABLE results ADD COLUMN needs_review INTEGER DEFAULT 0";
+    sqlite3_exec(db_, add_column_sql, nullptr, nullptr, nullptr);
+    
     const char* create_index1 = "CREATE INDEX IF NOT EXISTS idx_hashes ON results(f_hash, g_hash)";
     const char* create_index2 = "CREATE INDEX IF NOT EXISTS idx_both_divisible ON results(both_divisible)";
+    const char* create_index3 = "CREATE INDEX IF NOT EXISTS idx_needs_review ON results(needs_review)";
     
     sqlite3_exec(db_, create_index1, nullptr, nullptr, nullptr);
     sqlite3_exec(db_, create_index2, nullptr, nullptr, nullptr);
+    sqlite3_exec(db_, create_index3, nullptr, nullptr, nullptr);
 }
 
 std::optional<CachedResult> ResultCache::get_result(const GiNaC::ex& f, const GiNaC::ex& g) {
@@ -85,7 +91,8 @@ std::optional<CachedResult> ResultCache::get_result(const GiNaC::ex& f, const Gi
         r.df_divisible = sqlite3_column_int(stmt, 7) != 0;
         r.dg_divisible = sqlite3_column_int(stmt, 8) != 0;
         r.both_divisible = sqlite3_column_int(stmt, 9) != 0;
-        r.timestamp = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 10));
+        r.needs_review = sqlite3_column_int(stmt, 10) != 0;
+        r.timestamp = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 11));
         
         result = r;
     }
@@ -97,7 +104,8 @@ std::optional<CachedResult> ResultCache::get_result(const GiNaC::ex& f, const Gi
 void ResultCache::save_result(const GiNaC::ex& f, const GiNaC::ex& g,
                                const std::optional<GiNaC::ex>& q,
                                const DivisibilityResult& divisibility,
-                               bool is_trivial) {
+                               bool is_trivial,
+                               bool needs_review) {
     std::ostringstream f_oss, g_oss;
     f_oss << f;
     g_oss << g;
@@ -109,8 +117,8 @@ void ResultCache::save_result(const GiNaC::ex& f, const GiNaC::ex& g,
     
     const char* sql = R"(
         INSERT OR REPLACE INTO results
-        (f_poly, g_poly, f_hash, g_hash, q_poly, is_trivial, df_divisible, dg_divisible, both_divisible)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (f_poly, g_poly, f_hash, g_hash, q_poly, is_trivial, df_divisible, dg_divisible, both_divisible, needs_review)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     )";
     
     sqlite3_stmt* stmt;
@@ -136,6 +144,7 @@ void ResultCache::save_result(const GiNaC::ex& f, const GiNaC::ex& g,
     sqlite3_bind_int(stmt, 7, divisibility.df_divisible ? 1 : 0);
     sqlite3_bind_int(stmt, 8, divisibility.dg_divisible ? 1 : 0);
     sqlite3_bind_int(stmt, 9, divisibility.both_divisible ? 1 : 0);
+    sqlite3_bind_int(stmt, 10, needs_review ? 1 : 0);
     
     sqlite3_step(stmt);
     sqlite3_finalize(stmt);
@@ -253,7 +262,7 @@ std::vector<StatRow> ResultCache::get_detailed_statistics() {
     return rows;
 }
 
-std::vector<CachedResult> ResultCache::query_results(bool both_divisible, bool nontrivial_only, bool trivial_only) {
+std::vector<CachedResult> ResultCache::query_results(bool both_divisible, bool nontrivial_only, bool trivial_only, bool needs_review) {
     std::string sql = "SELECT * FROM results WHERE 1=1";
     
     if (both_divisible) {
@@ -266,6 +275,10 @@ std::vector<CachedResult> ResultCache::query_results(bool both_divisible, bool n
     
     if (trivial_only) {
         sql += " AND is_trivial = 1";
+    }
+    
+    if (needs_review) {
+        sql += " AND needs_review = 1";
     }
     
     sql += " ORDER BY timestamp DESC";
@@ -289,7 +302,8 @@ std::vector<CachedResult> ResultCache::query_results(bool both_divisible, bool n
             r.df_divisible = sqlite3_column_int(stmt, 7) != 0;
             r.dg_divisible = sqlite3_column_int(stmt, 8) != 0;
             r.both_divisible = sqlite3_column_int(stmt, 9) != 0;
-            r.timestamp = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 10));
+            r.needs_review = sqlite3_column_int(stmt, 10) != 0;
+            r.timestamp = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 11));
             
             results.push_back(r);
         }
