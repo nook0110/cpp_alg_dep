@@ -48,8 +48,13 @@ target_link_libraries(poly_dep_check PRIVATE
 target_compile_options(poly_dep_check PRIVATE
     -Wall -Wextra -Wpedantic
     -fcoroutines
+    -Ofast -march=native -mtune=native -flto
     ${GINAC_CFLAGS_OTHER}
     ${CLN_CFLAGS_OTHER}
+)
+
+target_link_options(poly_dep_check PRIVATE
+    -flto
 )
 
 add_executable(test_cube_extraction
