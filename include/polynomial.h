@@ -4,13 +4,14 @@
 #include <string>
 #include <optional>
 
-class PolynomialOps {
-public:
-    static GiNaC::ex parse_polynomial(const std::string& expr);
-    static GiNaC::ex partial_derivative(const GiNaC::ex& poly, const GiNaC::symbol& var);
-    static GiNaC::ex substitute(const GiNaC::ex& poly, const GiNaC::symbol& var, const GiNaC::ex& expr);
-    static bool is_divisible(const GiNaC::ex& dividend, const GiNaC::ex& divisor);
-    static std::string poly_hash(const GiNaC::ex& poly);
-    static bool is_zero(const GiNaC::ex& poly);
-    static int total_degree(const GiNaC::ex& poly);
-};
+namespace poly {
+    GiNaC::ex parse_polynomial(const std::string& expr);
+    GiNaC::ex parse_polynomial(const std::string& expr, const GiNaC::symbol& x, const GiNaC::symbol& y);
+    GiNaC::ex partial_derivative(const GiNaC::ex& poly, const GiNaC::symbol& var);
+    GiNaC::ex substitute(const GiNaC::ex& poly, const GiNaC::symbol& var, const GiNaC::ex& expr);
+    bool is_divisible(const GiNaC::ex& dividend, const GiNaC::ex& divisor);
+    std::string poly_hash(const GiNaC::ex& poly);
+    bool is_zero(const GiNaC::ex& poly);
+    int total_degree(const GiNaC::ex& poly);
+    std::optional<GiNaC::ex> extract_cube_root(const GiNaC::ex& poly);
+}

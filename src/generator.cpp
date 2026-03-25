@@ -1,12 +1,11 @@
 #include "generator.h"
-#include "symbols.h"
 #include <iostream>
 #include <cmath>
 
-PolynomialGenerator::PolynomialGenerator(const Config& config)
-    : config_(config), x_(PolySymbols::x), y_(PolySymbols::y) {}
+PolynomialGenerator::PolynomialGenerator(const Config& config, std::atomic<bool>& shutdown, const std::vector<int>& f_resume, const std::vector<int>& g_resume)
+    : config_(config), shutdown_requested_(shutdown), x_("x"), y_("y"), f_resume_(f_resume), g_resume_(g_resume), f_coeffs_(f_resume), g_coeffs_(g_resume) {}
 
-std::generator<GiNaC::ex> PolynomialGenerator::generate_polynomials_lazy(int max_degree) {
+std::generator<GiNaC::ex> PolynomialGenerator::generate_polynomials_lazy(int max_degree, const std::vector<int>& resume_coeffs, PolyType type) {
     const int coeff_min = config_.coeff_min;
     const int coeff_max = config_.coeff_max;
     
@@ -21,7 +20,16 @@ std::generator<GiNaC::ex> PolynomialGenerator::generate_polynomials_lazy(int max
     const int num_terms = monomials.size();
     std::vector<int> coeffs(num_terms, coeff_min);
     
+    if (!resume_coeffs.empty() && resume_coeffs.size() == static_cast<size_t>(num_terms)) {
+        coeffs = resume_coeffs;
+    }
+    
+    size_t iteration_count = 0;
     while (true) {
+        if (shutdown_requested_.load()) {
+            break;
+        }
+        
         GiNaC::ex poly = 0;
         
         for (size_t idx = 0; idx < monomials.size(); ++idx) {
@@ -31,8 +39,20 @@ std::generator<GiNaC::ex> PolynomialGenerator::generate_polynomials_lazy(int max
             }
         }
         
-        if (!poly.is_zero()) {
+        if (!poly.is_zero() && !GiNaC::is_a<GiNaC::numeric>(poly)) {
+            // Save coefficients BEFORE yielding
+            if (type == PolyType::F) {
+                f_coeffs_ = coeffs;
+            } else {
+                g_coeffs_ = coeffs;
+            }
+            
+            iteration_count++;
             co_yield poly;
+            
+            if (shutdown_requested_.load()) {
+                break;
+            }
         }
         
         int pos = 0;

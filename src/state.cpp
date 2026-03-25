@@ -30,10 +30,13 @@ void BruteForceState::save(const std::string& filepath) {
     json j;
     j["last_f_index"] = last_f_index;
     j["last_g_index"] = last_g_index;
+    j["total_pairs_generated"] = total_pairs_generated;
     j["total_pairs_checked"] = total_pairs_checked;
     j["pairs_with_dependency"] = pairs_with_dependency;
     j["start_time"] = start_time.value_or("");
     j["last_checkpoint"] = last_checkpoint.value_or("");
+    j["f_coeffs_state"] = f_coeffs_state;
+    j["g_coeffs_state"] = g_coeffs_state;
     
     std::ofstream file(filepath);
     file << j.dump(2);
@@ -54,6 +57,7 @@ BruteForceState BruteForceState::load(const std::string& filepath) {
         
         state.last_f_index = j.value("last_f_index", 0);
         state.last_g_index = j.value("last_g_index", 0);
+        state.total_pairs_generated = j.value("total_pairs_generated", 0);
         state.total_pairs_checked = j.value("total_pairs_checked", 0);
         state.pairs_with_dependency = j.value("pairs_with_dependency", 0);
         
@@ -62,6 +66,13 @@ BruteForceState BruteForceState::load(const std::string& filepath) {
         
         std::string checkpoint = j.value("last_checkpoint", "");
         if (!checkpoint.empty()) state.last_checkpoint = checkpoint;
+        
+        if (j.contains("f_coeffs_state")) {
+            state.f_coeffs_state = j["f_coeffs_state"].get<std::vector<int>>();
+        }
+        if (j.contains("g_coeffs_state")) {
+            state.g_coeffs_state = j["g_coeffs_state"].get<std::vector<int>>();
+        }
     } catch (...) {
         state.start_time = get_current_time_iso();
     }
@@ -80,6 +91,7 @@ void BruteForceState::update_progress(int f_index, int g_index, bool found_depen
 
 std::string BruteForceState::get_summary() const {
     std::ostringstream oss;
+    oss << "Total pairs generated: " << total_pairs_generated << "\n";
     oss << "Total pairs checked: " << total_pairs_checked << "\n";
     oss << "Pairs with dependency: " << pairs_with_dependency << "\n";
     oss << "Last position: f_index=" << last_f_index << ", g_index=" << last_g_index << "\n";

@@ -62,8 +62,8 @@ void ResultCache::create_tables() {
 }
 
 std::optional<CachedResult> ResultCache::get_result(const GiNaC::ex& f, const GiNaC::ex& g) {
-    std::string f_hash_val = PolynomialOps::poly_hash(f);
-    std::string g_hash_val = PolynomialOps::poly_hash(g);
+    std::string f_hash_val = poly::poly_hash(f);
+    std::string g_hash_val = poly::poly_hash(g);
     
     const char* sql = "SELECT * FROM results WHERE f_hash = ? AND g_hash = ?";
     sqlite3_stmt* stmt;
@@ -112,8 +112,8 @@ void ResultCache::save_result(const GiNaC::ex& f, const GiNaC::ex& g,
     
     std::string f_str = f_oss.str();
     std::string g_str = g_oss.str();
-    std::string f_hash_val = PolynomialOps::poly_hash(f);
-    std::string g_hash_val = PolynomialOps::poly_hash(g);
+    std::string f_hash_val = poly::poly_hash(f);
+    std::string g_hash_val = poly::poly_hash(g);
     
     const char* sql = R"(
         INSERT OR REPLACE INTO results

@@ -21,8 +21,8 @@ void ManualChecker::check_pair(const std::string& f_str, const std::string& g_st
     
     GiNaC::ex f, g;
     try {
-        f = PolynomialOps::parse_polynomial(f_str);
-        g = PolynomialOps::parse_polynomial(g_str);
+        f = poly::parse_polynomial(f_str, symbols_.x, symbols_.y);
+        g = poly::parse_polynomial(g_str, symbols_.x, symbols_.y);
     } catch (const std::exception& e) {
         std::cerr << "Error parsing polynomials: " << e.what() << std::endl;
         return;
@@ -48,7 +48,7 @@ void ManualChecker::check_pair(const std::string& f_str, const std::string& g_st
     if (!q.has_value()) {
         std::cout << "No dependency found within degree bounds." << std::endl;
         std::cout << std::endl;
-        cache_->save_result(f, g, std::nullopt, {false, false, false}, false);
+        cache_->save_result(f, g, std::nullopt, {false, false, false, false, false, std::nullopt}, false);
         return;
     }
     
@@ -63,11 +63,16 @@ void ManualChecker::check_pair(const std::string& f_str, const std::string& g_st
     std::cout << "Checking divisibility conditions..." << std::endl;
     auto divisibility = checker_->check_conditions(q.value(), f, g);
     
+    if (divisibility.is_cube && divisibility.cube_base.has_value()) {
+        std::cout << "  ℹ q is a perfect cube: q = (" << divisibility.cube_base.value() << ")³" << std::endl;
+        std::cout << "  Checking divisibility with cube base..." << std::endl;
+    }
+    
     std::cout << "  dq/du : dq/dx = " << (divisibility.df_divisible ? "true" : "false") << std::endl;
     std::cout << "  dq/dv : dq/dx = " << (divisibility.dg_divisible ? "true" : "false") << std::endl;
     std::cout << std::endl;
     
-    if (divisibility.needs_review) {
+    if (divisibility.needs_review && !divisibility.is_cube) {
         std::cout << "⚠ WARNING: All derivatives are zero (0/0 case) - flagged for review" << std::endl;
     }
     

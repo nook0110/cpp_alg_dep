@@ -11,6 +11,9 @@ pkg_check_modules(CLN REQUIRED cln)
 
 find_package(SQLite3 REQUIRED)
 find_package(nlohmann_json 3.2.0 REQUIRED)
+find_package(GTest REQUIRED)
+
+enable_testing()
 
 add_executable(poly_dep_check
     src/main.cpp
@@ -22,6 +25,7 @@ add_executable(poly_dep_check
     src/divisibility.cpp
     src/cache.cpp
     src/state.cpp
+    src/worker_pool.cpp
     src/brute_force.cpp
     src/manual_check.cpp
     src/cli.cpp
@@ -47,5 +51,59 @@ target_compile_options(poly_dep_check PRIVATE
     ${GINAC_CFLAGS_OTHER}
     ${CLN_CFLAGS_OTHER}
 )
+
+add_executable(test_cube_extraction
+    tests/test_cube_extraction.cpp
+    src/polynomial.cpp
+    src/symbols.cpp
+)
+
+target_include_directories(test_cube_extraction PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${GINAC_INCLUDE_DIRS}
+    ${CLN_INCLUDE_DIRS}
+)
+
+target_link_libraries(test_cube_extraction PRIVATE
+    ${GINAC_LIBRARIES}
+    ${CLN_LIBRARIES}
+    GTest::gtest
+    GTest::gtest_main
+)
+
+target_compile_options(test_cube_extraction PRIVATE
+    -Wall -Wextra -Wpedantic
+    ${GINAC_CFLAGS_OTHER}
+    ${CLN_CFLAGS_OTHER}
+)
+
+add_test(NAME CubeExtractionTest COMMAND test_cube_extraction)
+
+add_executable(test_resume
+    tests/test_resume.cpp
+    src/generator.cpp
+    src/symbols.cpp
+)
+
+target_include_directories(test_resume PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${GINAC_INCLUDE_DIRS}
+    ${CLN_INCLUDE_DIRS}
+)
+
+target_link_libraries(test_resume PRIVATE
+    ${GINAC_LIBRARIES}
+    ${CLN_LIBRARIES}
+    GTest::gtest
+    GTest::gtest_main
+)
+
+target_compile_options(test_resume PRIVATE
+    -Wall -Wextra -Wpedantic
+    ${GINAC_CFLAGS_OTHER}
+    ${CLN_CFLAGS_OTHER}
+)
+
+add_test(NAME ResumeTest COMMAND test_resume)
 
 install(TARGETS poly_dep_check DESTINATION bin)

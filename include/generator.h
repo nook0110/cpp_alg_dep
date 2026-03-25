@@ -1,28 +1,45 @@
 #pragma once
 
 #include "config.h"
+#include "state.h"
 #include <ginac/ginac.h>
 #include <vector>
 #include <utility>
 #include <generator>
 #include <iostream>
+#include <atomic>
+
+enum class PolyType { F, G };
 
 class PolynomialGenerator {
 public:
-    explicit PolynomialGenerator(const Config& config);
+    explicit PolynomialGenerator(const Config& config, std::atomic<bool>& shutdown, const std::vector<int>& f_resume = {}, const std::vector<int>& g_resume = {});
     
     template<typename Callback>
     void generate_pairs(Callback callback);
     
     size_t count_total_pairs() const;
+    
+    const std::vector<int>& get_f_coeffs() const { return f_coeffs_; }
+    const std::vector<int>& get_g_coeffs() const { return g_coeffs_; }
+    int get_f_index() const { return f_index_; }
+    int get_g_index() const { return g_index_; }
 
 private:
     Config config_;
+    std::atomic<bool>& shutdown_requested_;
     GiNaC::symbol x_;
     GiNaC::symbol y_;
+    std::vector<int> f_resume_;
+    std::vector<int> g_resume_;
+    std::vector<int> f_coeffs_;
+    std::vector<int> g_coeffs_;
+    bool is_first_f_ = true;
     
-    std::generator<GiNaC::ex> generate_polynomials_lazy(int max_degree);
+    std::generator<GiNaC::ex> generate_polynomials_lazy(int max_degree, const std::vector<int>& resume_coeffs, PolyType type);
     bool should_skip(const GiNaC::ex& f, const GiNaC::ex& g) const;
+    int f_index_ = 0;
+    int g_index_ = 0;
 };
 
 template<typename Callback>
@@ -30,8 +47,26 @@ void PolynomialGenerator::generate_pairs(Callback callback) {
     std::cout << "Starting lazy pair generation..." << std::endl;
     size_t pair_count = 0;
     
-    for (const auto& f : generate_polynomials_lazy(config_.max_degree_f)) {
-        for (const auto& g : generate_polynomials_lazy(config_.max_degree_g)) {
+    if (!f_resume_.empty() || !g_resume_.empty()) {
+        std::cout << "Resuming from previous state" << std::endl;
+    }
+    
+    f_index_ = 0;
+    is_first_f_ = true;
+    for (const auto& f : generate_polynomials_lazy(config_.max_degree_f, f_resume_, PolyType::F)) {
+        if (shutdown_requested_.load()) {
+            std::cout << "[DEBUG] Shutdown detected in outer f loop at f_index=" << f_index_ << std::endl;
+            break;
+        }
+        
+        g_index_ = 0;
+        for (const auto& g : generate_polynomials_lazy(config_.max_degree_g, {}, PolyType::G)) {
+            if (shutdown_requested_.load()) {
+                std::cout << "[DEBUG] Shutdown detected in inner g loop at f_index=" << f_index_
+                          << ", g_index=" << g_index_ << std::endl;
+                break;
+            }
+            
             if (!should_skip(f, g)) {
                 callback(f, g);
                 pair_count++;
@@ -39,6 +74,17 @@ void PolynomialGenerator::generate_pairs(Callback callback) {
                     std::cout << "Processed " << pair_count << " pairs..." << std::endl;
                 }
             }
+            g_index_++;
         }
+        
+        if (shutdown_requested_.load()) {
+            std::cout << "[DEBUG] Shutdown detected after inner g loop, breaking outer loop" << std::endl;
+            break;
+        }
+        
+        is_first_f_ = false;
+        f_index_++;
     }
+    
+    std::cout << "[DEBUG] Exited generate_pairs loops. Total pairs processed: " << pair_count << std::endl;
 }

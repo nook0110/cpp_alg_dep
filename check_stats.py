@@ -10,35 +10,68 @@ def get_db_stats(db_path):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
-    query = """
-        SELECT
-            COUNT(*) as total,
-            SUM(CASE WHEN q_poly IS NOT NULL THEN 1 ELSE 0 END) as with_dependency,
-            SUM(CASE WHEN is_trivial = 1 THEN 1 ELSE 0 END) as trivial_rejected,
-            SUM(CASE WHEN q_poly IS NOT NULL AND is_trivial = 0 THEN 1 ELSE 0 END) as nontrivial_found,
-            SUM(CASE WHEN df_divisible = 1 AND dg_divisible = 0 THEN 1 ELSE 0 END) as df_divisible_only,
-            SUM(CASE WHEN df_divisible = 0 AND dg_divisible = 1 THEN 1 ELSE 0 END) as dg_divisible_only,
-            SUM(CASE WHEN both_divisible = 1 THEN 1 ELSE 0 END) as both_divisible,
-            SUM(CASE WHEN q_poly IS NULL THEN 1 ELSE 0 END) as no_dependency,
-            SUM(CASE WHEN needs_review = 1 THEN 1 ELSE 0 END) as needs_review
-        FROM results
-    """
+    cursor.execute("PRAGMA table_info(results)")
+    columns = [col[1] for col in cursor.fetchall()]
+    has_needs_review = 'needs_review' in columns
+    
+    if has_needs_review:
+        query = """
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN q_poly IS NOT NULL THEN 1 ELSE 0 END) as with_dependency,
+                SUM(CASE WHEN is_trivial = 1 THEN 1 ELSE 0 END) as trivial_rejected,
+                SUM(CASE WHEN q_poly IS NOT NULL AND is_trivial = 0 THEN 1 ELSE 0 END) as nontrivial_found,
+                SUM(CASE WHEN df_divisible = 1 AND dg_divisible = 0 THEN 1 ELSE 0 END) as df_divisible_only,
+                SUM(CASE WHEN df_divisible = 0 AND dg_divisible = 1 THEN 1 ELSE 0 END) as dg_divisible_only,
+                SUM(CASE WHEN both_divisible = 1 THEN 1 ELSE 0 END) as both_divisible,
+                SUM(CASE WHEN q_poly IS NULL THEN 1 ELSE 0 END) as no_dependency,
+                SUM(CASE WHEN needs_review = 1 THEN 1 ELSE 0 END) as needs_review
+            FROM results
+        """
+    else:
+        query = """
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN q_poly IS NOT NULL THEN 1 ELSE 0 END) as with_dependency,
+                SUM(CASE WHEN is_trivial = 1 THEN 1 ELSE 0 END) as trivial_rejected,
+                SUM(CASE WHEN q_poly IS NOT NULL AND is_trivial = 0 THEN 1 ELSE 0 END) as nontrivial_found,
+                SUM(CASE WHEN df_divisible = 1 AND dg_divisible = 0 THEN 1 ELSE 0 END) as df_divisible_only,
+                SUM(CASE WHEN df_divisible = 0 AND dg_divisible = 1 THEN 1 ELSE 0 END) as dg_divisible_only,
+                SUM(CASE WHEN both_divisible = 1 THEN 1 ELSE 0 END) as both_divisible,
+                SUM(CASE WHEN q_poly IS NULL THEN 1 ELSE 0 END) as no_dependency,
+                0 as needs_review
+            FROM results
+        """
     
     cursor.execute(query)
     row = cursor.fetchone()
     
-    detailed_query = """
-        SELECT
-            CASE WHEN q_poly IS NULL THEN 0 ELSE 1 END as has_dep,
-            COALESCE(is_trivial, 0) as is_trivial,
-            COALESCE(df_divisible, 0) as df_div,
-            COALESCE(dg_divisible, 0) as dg_div,
-            COALESCE(needs_review, 0) as needs_rev,
-            COUNT(*) as count
-        FROM results
-        GROUP BY has_dep, is_trivial, df_div, dg_div, needs_rev
-        ORDER BY has_dep DESC, is_trivial ASC, df_div DESC, dg_div DESC, needs_rev DESC
-    """
+    if has_needs_review:
+        detailed_query = """
+            SELECT
+                CASE WHEN q_poly IS NULL THEN 0 ELSE 1 END as has_dep,
+                COALESCE(is_trivial, 0) as is_trivial,
+                COALESCE(df_divisible, 0) as df_div,
+                COALESCE(dg_divisible, 0) as dg_div,
+                COALESCE(needs_review, 0) as needs_rev,
+                COUNT(*) as count
+            FROM results
+            GROUP BY has_dep, is_trivial, df_div, dg_div, needs_rev
+            ORDER BY has_dep DESC, is_trivial ASC, df_div DESC, dg_div DESC, needs_rev DESC
+        """
+    else:
+        detailed_query = """
+            SELECT
+                CASE WHEN q_poly IS NULL THEN 0 ELSE 1 END as has_dep,
+                COALESCE(is_trivial, 0) as is_trivial,
+                COALESCE(df_divisible, 0) as df_div,
+                COALESCE(dg_divisible, 0) as dg_div,
+                0 as needs_rev,
+                COUNT(*) as count
+            FROM results
+            GROUP BY has_dep, is_trivial, df_div, dg_div
+            ORDER BY has_dep DESC, is_trivial ASC, df_div DESC, dg_div DESC
+        """
     
     cursor.execute(detailed_query)
     detailed_rows = cursor.fetchall()
@@ -77,49 +110,131 @@ def get_db_stats(db_path):
         'detailed': detailed
     }
 
-def merge_stats(stats_list):
-    merged = {
-        'total': 0,
-        'with_dependency': 0,
-        'trivial_rejected': 0,
-        'nontrivial_found': 0,
-        'df_divisible_only': 0,
-        'dg_divisible_only': 0,
-        'both_divisible': 0,
-        'no_dependency': 0,
-        'needs_review': 0,
-        'detailed': {}
-    }
+def merge_stats_from_dbs(db_files):
+    """Merge statistics from multiple databases, deduplicating by (f_poly, g_poly)."""
+    # Create in-memory database for merging
+    conn = sqlite3.connect(':memory:')
+    cursor = conn.cursor()
     
-    for stats in stats_list:
-        for key in ['total', 'with_dependency', 'trivial_rejected', 'nontrivial_found',
-                    'df_divisible_only', 'dg_divisible_only', 'both_divisible', 'no_dependency', 'needs_review']:
-            merged[key] += stats[key]
+    # Create merged table with UNIQUE constraint on actual polynomials
+    cursor.execute('''
+        CREATE TABLE merged_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            f_poly TEXT NOT NULL,
+            g_poly TEXT NOT NULL,
+            f_hash TEXT NOT NULL,
+            g_hash TEXT NOT NULL,
+            q_poly TEXT,
+            is_trivial INTEGER DEFAULT 0,
+            df_divisible INTEGER,
+            dg_divisible INTEGER,
+            both_divisible INTEGER,
+            needs_review INTEGER DEFAULT 0,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(f_poly, g_poly)
+        )
+    ''')
+    
+    # Merge all databases by reading each one separately
+    for db_file in db_files:
+        try:
+            # Open worker database
+            worker_conn = sqlite3.connect(db_file)
+            worker_cursor = worker_conn.cursor()
+            
+            # Read all rows
+            worker_cursor.execute('''
+                SELECT f_poly, g_poly, f_hash, g_hash, q_poly, is_trivial,
+                       df_divisible, dg_divisible, both_divisible,
+                       COALESCE(needs_review, 0), timestamp
+                FROM results
+            ''')
+            
+            rows = worker_cursor.fetchall()
+            worker_conn.close()
+            
+            # Insert into merged database
+            cursor.executemany('''
+                INSERT OR IGNORE INTO merged_results
+                (f_poly, g_poly, f_hash, g_hash, q_poly, is_trivial,
+                 df_divisible, dg_divisible, both_divisible, needs_review, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', rows)
+            
+        except Exception as e:
+            pass
+    
+    # Now get stats from merged database
+    return get_db_stats_from_connection(conn)
+
+def get_db_stats_from_connection(conn):
+    """Get statistics from an open database connection."""
+    cursor = conn.cursor()
+    
+    query = """
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN q_poly IS NOT NULL THEN 1 ELSE 0 END) as with_dependency,
+            SUM(CASE WHEN is_trivial = 1 THEN 1 ELSE 0 END) as trivial_rejected,
+            SUM(CASE WHEN q_poly IS NOT NULL AND is_trivial = 0 THEN 1 ELSE 0 END) as nontrivial_found,
+            SUM(CASE WHEN df_divisible = 1 AND dg_divisible = 0 THEN 1 ELSE 0 END) as df_divisible_only,
+            SUM(CASE WHEN df_divisible = 0 AND dg_divisible = 1 THEN 1 ELSE 0 END) as dg_divisible_only,
+            SUM(CASE WHEN both_divisible = 1 THEN 1 ELSE 0 END) as both_divisible,
+            SUM(CASE WHEN q_poly IS NULL THEN 1 ELSE 0 END) as no_dependency,
+            SUM(CASE WHEN needs_review = 1 THEN 1 ELSE 0 END) as needs_review
+        FROM merged_results
+    """
+    
+    cursor.execute(query)
+    row = cursor.fetchone()
+    
+    detailed_query = """
+        SELECT
+            CASE WHEN q_poly IS NULL THEN 0 ELSE 1 END as has_dep,
+            COALESCE(is_trivial, 0) as is_trivial,
+            COALESCE(df_divisible, 0) as df_div,
+            COALESCE(dg_divisible, 0) as dg_div,
+            COALESCE(needs_review, 0) as needs_rev,
+            COUNT(*) as count
+        FROM merged_results
+        GROUP BY has_dep, is_trivial, df_div, dg_div, needs_rev
+        ORDER BY has_dep DESC, is_trivial ASC, df_div DESC, dg_div DESC, needs_rev DESC
+    """
+    
+    cursor.execute(detailed_query)
+    detailed_rows = cursor.fetchall()
+    
+    detailed = []
+    for drow in detailed_rows:
+        has_dependency = drow[0] != 0
+        is_trivial = drow[1] != 0
+        df_divisible = drow[2] != 0
+        dg_divisible = drow[3] != 0
+        needs_review = drow[4] != 0
+        count = drow[5]
         
-        for detail in stats.get('detailed', []):
-            key = (detail['has_dependency'], detail['is_nontrivial'],
-                   detail['df_divisible'], detail['dg_divisible'], detail['both_divisible'], detail['needs_review'])
-            if key not in merged['detailed']:
-                merged['detailed'][key] = 0
-            merged['detailed'][key] += detail['count']
-    
-    detailed_list = []
-    for key, count in merged['detailed'].items():
-        detailed_list.append({
-            'has_dependency': key[0],
-            'is_nontrivial': key[1],
-            'df_divisible': key[2],
-            'dg_divisible': key[3],
-            'both_divisible': key[4],
-            'needs_review': key[5],
+        detailed.append({
+            'has_dependency': has_dependency,
+            'is_nontrivial': has_dependency and not is_trivial,
+            'df_divisible': df_divisible,
+            'dg_divisible': dg_divisible,
+            'both_divisible': df_divisible and dg_divisible,
+            'needs_review': needs_review,
             'count': count
         })
     
-    detailed_list.sort(key=lambda x: (not x['has_dependency'], x['is_nontrivial'],
-                                       not x['df_divisible'], not x['dg_divisible']))
-    merged['detailed'] = detailed_list
-    
-    return merged
+    return {
+        'total': row[0],
+        'with_dependency': row[1],
+        'trivial_rejected': row[2],
+        'nontrivial_found': row[3],
+        'df_divisible_only': row[4],
+        'dg_divisible_only': row[5],
+        'both_divisible': row[6],
+        'no_dependency': row[7],
+        'needs_review': row[8],
+        'detailed': detailed
+    }
 
 def query_polynomials(db_files, has_dep=None, is_nontrivial=None, df_div=None, dg_div=None, both_div=None, needs_rev=None, limit=None):
     results = []
@@ -276,8 +391,7 @@ Examples:
                 print(f"Error reading {db_file}: {e}")
     
     if len(all_stats) > 1:
-        merged = merge_stats([s for _, s in all_stats])
-        stats = merged
+        stats = merge_stats_from_dbs(db_files)
         title = "MERGED STATISTICS FROM ALL DATABASES"
     elif len(all_stats) == 1:
         _, stats = all_stats[0]
@@ -292,10 +406,10 @@ Examples:
     print(f"Total pairs checked: {stats['total']}")
     print()
     
-    print("+--------------+-----------------+-----------------+-----------------+-------------+---------+-----------+")
-    print("| Dependency   | Non-trivial     | dq/df : dq/dx   | dq/dg : dq/dx   | Both        |   Count | Percent   |")
-    print("| Found        | (x^2/x*u/x*v)   |                 |                 | Divisible   |         |           |")
-    print("+==============+=================+=================+=================+=============+=========+===========+")
+    print("+--------------+-----------------+-----------------+-----------------+-------------+--------------+---------+-----------+")
+    print("| Dependency   | Non-trivial     | dq/df : dq/dx   | dq/dg : dq/dx   | Both        | Needs        |   Count | Percent   |")
+    print("| Found        | (x^2/x*u/x*v)   |                 |                 | Divisible   | Review       |         |           |")
+    print("+==============+=================+=================+=================+=============+==============+=========+===========+")
     
     for row in stats['detailed']:
         dep_status = "+" if row['has_dependency'] else "-"
@@ -303,11 +417,12 @@ Examples:
         df_status = "+" if row['df_divisible'] else "-"
         dg_status = "+" if row['dg_divisible'] else "-"
         both_status = "+" if row['both_divisible'] else "-"
+        review_status = "⚠" if row.get('needs_review') else "-"
         
         pct = (100.0 * row['count'] / stats['total']) if stats['total'] > 0 else 0.0
         
-        print(f"| {dep_status:<12} | {nontrivial_status:<15} | {df_status:<15} | {dg_status:<15} | {both_status:<11} | {row['count']:>7} | {pct:>8.2f}% |")
-        print("+--------------+-----------------+-----------------+-----------------+-------------+---------+-----------+")
+        print(f"| {dep_status:<12} | {nontrivial_status:<15} | {df_status:<15} | {dg_status:<15} | {both_status:<11} | {review_status:<12} | {row['count']:>7} | {pct:>8.2f}% |")
+        print("+--------------+-----------------+-----------------+-----------------+-------------+--------------+---------+-----------+")
     
     print()
     print(f"Cases needing review (0/0 derivatives): {stats.get('needs_review', 0)}")

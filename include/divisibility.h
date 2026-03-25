@@ -10,6 +10,8 @@ struct DivisibilityResult {
     bool dg_divisible = false;
     bool both_divisible = false;
     bool needs_review = false;
+    bool is_cube = false;
+    std::optional<GiNaC::ex> cube_base;
 };
 
 class DivisibilityChecker {
