@@ -4,7 +4,7 @@
 # Continues running until the program completes successfully (exit code 0)
 
 EXECUTABLE="./build/poly_dep_check"
-ARGS="brute --max-degree-f 2 --max-degree-g 2 --coeff-min -1 --coeff-max 1 --batch-size 1000"
+ARGS="brute --max-degree-f 3 --max-degree-g 3 --max-degree-q 10 --coeff-min -1 --coeff-max 1 --num-workers 96"
 
 # Clean up old data
 echo "Cleaning up old data..."
