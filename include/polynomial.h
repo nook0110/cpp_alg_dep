@@ -14,4 +14,5 @@ namespace poly {
     bool is_zero(const GiNaC::ex& poly);
     int total_degree(const GiNaC::ex& poly);
     std::optional<GiNaC::ex> extract_cube_root(const GiNaC::ex& poly);
+    std::optional<GiNaC::ex> extract_min_poly(const GiNaC::ex& h, const GiNaC::symbol& v, const GiNaC::symbol& x, int n);
 }

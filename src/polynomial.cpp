@@ -200,4 +200,50 @@ std::optional<ex> extract_cube_root(const ex& poly) {
     }
 }
 
+std::optional<ex> extract_min_poly(const ex& h, const symbol& v, const symbol& x, int n) {
+    try {
+        const auto expanded_h = expand(h);
+
+        if (expanded_h.is_zero()) {
+            return std::nullopt;
+        }
+
+        ex h_reduced = expanded_h;
+
+        const auto a_x = expand(expanded_h.coeff(v, n) * pow(numeric(-1), n));
+        if (!a_x.is_zero() && !is_a<numeric>(a_x)) {
+            const auto q_tmp = expand(quo(expanded_h, a_x, x));
+            if (expand(q_tmp * a_x - expanded_h).is_zero()) {
+                h_reduced = q_tmp;
+            }
+        }
+
+        if (h_reduced.is_zero()) {
+            return std::nullopt;
+        }
+
+        const auto dh_dv = h_reduced.diff(v);
+
+        if (dh_dv.is_zero()) {
+            return h_reduced;
+        }
+
+        const auto g = gcd(h_reduced, dh_dv);
+
+        if (g.is_zero()) {
+            return std::nullopt;
+        }
+
+        auto q = expand(quo(h_reduced, g, v));
+
+        if (q.is_zero()) {
+            return std::nullopt;
+        }
+
+        return q;
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
 }

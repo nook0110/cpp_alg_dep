@@ -3,16 +3,13 @@
 
 using namespace GiNaC;
 
-DependencyFinder::DependencyFinder(const Config& config, const ThreadLocalSymbols& symbols)
-    : config_(config), symbols_(symbols) {}
-
-bool DependencyFinder::is_nontrivial_in_x(const ex& q) const {
+bool is_nontrivial_in_x(const ex& q, const ThreadLocalSymbols& symbols) {
     try {
         for (const auto& term : q) {
-            int x_deg = term.degree(symbols_.x);
-            int u_deg = term.degree(symbols_.u);
-            int v_deg = term.degree(symbols_.v);
-            
+            const auto x_deg = term.degree(symbols.x);
+            const auto u_deg = term.degree(symbols.u);
+            const auto v_deg = term.degree(symbols.v);
+
             if (x_deg == 0) continue;
             if (x_deg >= 2) return true;
             if (x_deg == 1 && (u_deg > 0 || v_deg > 0)) return true;
@@ -23,13 +20,16 @@ bool DependencyFinder::is_nontrivial_in_x(const ex& q) const {
     }
 }
 
+DependencyFinder::DependencyFinder(const Config& config, const ThreadLocalSymbols& symbols)
+    : config_(config), symbols_(symbols) {}
+
 std::pair<std::optional<ex>, bool> DependencyFinder::find_dependency(const ex& f, const ex& g) {
     auto q = try_resultant(f, g);
     if (q.has_value()) {
-        bool is_trivial = !is_nontrivial_in_x(q.value());
+        const auto is_trivial = !is_nontrivial_in_x(q.value(), symbols_);
         return {q, is_trivial};
     }
-    
+
     return {std::nullopt, false};
 }
 

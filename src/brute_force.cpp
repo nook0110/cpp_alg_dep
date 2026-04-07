@@ -61,18 +61,15 @@ void BruteForceRunner::run() {
     std::vector<std::pair<std::string, std::string>> batch;
     bool shutdown_msg_printed = false;
     
-    generator_->generate_pairs([&](const GiNaC::ex& f, const GiNaC::ex& g) {
+    generator_->generate_pairs([&](const Poly& f, const Poly& g) {
         if (shutdown_requested_.load()) {
             if (!shutdown_msg_printed) {
                 shutdown_msg_printed = true;
             }
             return;
         }
-        
-        std::ostringstream f_oss, g_oss;
-        f_oss << f;
-        g_oss << g;
-        batch.emplace_back(f_oss.str(), g_oss.str());
+
+        batch.emplace_back(poly_to_string(f), poly_to_string(g));
         
         if (batch.size() >= static_cast<size_t>(config_.batch_size)) {
             if (shutdown_requested_.load()) {

@@ -3,6 +3,7 @@
 #include "symbols.h"
 #include <ginac/ginac.h>
 #include <map>
+#include <optional>
 #include <string>
 
 struct DivisibilityResult {
@@ -10,8 +11,8 @@ struct DivisibilityResult {
     bool dg_divisible = false;
     bool both_divisible = false;
     bool needs_review = false;
-    bool is_cube = false;
-    std::optional<GiNaC::ex> cube_base;
+    bool used_min_poly = false;
+    std::optional<GiNaC::ex> min_poly;
 };
 
 class DivisibilityChecker {
