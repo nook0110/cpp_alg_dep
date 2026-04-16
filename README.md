@@ -59,21 +59,6 @@ Check a specific pair of polynomials:
 - `--cache-file`: Path to cache database (default: data/results.db)
 - `--state-file`: Path to state file for resume (default: data/state.json)
 
-### Resume from Checkpoint
-
-Resume a previously interrupted brute force search:
-
-```bash
-./run_with_resume.sh
-```
-
-### Run Until Complete
-
-Run brute force search until all combinations are checked:
-
-```bash
-./run_until_complete.sh
-```
 
 ## Project Structure
 
